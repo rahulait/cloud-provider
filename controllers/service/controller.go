@@ -738,6 +738,7 @@ func (c *Controller) nodeSyncService(svc *v1.Service) bool {
 	const retSuccess = false
 	const retNeedRetry = true
 	if svc == nil || !wantsLoadBalancer(svc) {
+		klog.V(2).Infof("##### in !wantsLoadBalancer(svc)")
 		return retSuccess
 	}
 	newNodes, err := listWithPredicates(c.nodeLister)
@@ -755,6 +756,7 @@ func (c *Controller) nodeSyncService(svc *v1.Service) bool {
 	// from the service sync
 	c.storeLastSyncedNodes(svc, newNodes)
 	if nodesSufficientlyEqual(oldNodes, newNodes) {
+		klog.V(2).Infof("##### in nodesSufficientlyEqual...")
 		return retSuccess
 	}
 	klog.V(4).Infof("nodeSyncService started for service %s/%s", svc.Namespace, svc.Name)
@@ -833,7 +835,12 @@ func (c *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []
 
 	// This operation doesn't normally take very long (and happens pretty often), so we only record the final event
 	err := c.balancer.UpdateLoadBalancer(context.TODO(), c.clusterName, service, hosts)
+	klog.V(2).Info("#### Done calling UpdateLoadBalancer of CCM")
+	if err != nil {
+		klog.Errorf("#### failed with error: %w", err)
+	}
 	if err == nil {
+		klog.V(2).Info("#### in err == nil condition")
 		// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
 		if len(hosts) == 0 {
 			c.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
@@ -852,10 +859,12 @@ func (c *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []
 	if _, exists, err := c.balancer.GetLoadBalancer(context.TODO(), c.clusterName, service); err != nil {
 		runtime.HandleError(fmt.Errorf("failed to check if load balancer exists for service %s/%s: %v", service.Namespace, service.Name, err))
 	} else if !exists {
+		klog.V(2).Info("#### In !exists condition")
 		return nil
 	}
 
 	c.eventRecorder.Eventf(service, v1.EventTypeWarning, "UpdateLoadBalancerFailed", "Error updating load balancer with new hosts %v [node names limited, total number of nodes: %d], error: %v", loggableNodeNames(hosts), len(hosts), err)
+	klog.V(2).Infof("#### Returning err %v", err)
 	return err
 }
 
